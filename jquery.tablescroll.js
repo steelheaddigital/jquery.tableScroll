@@ -71,9 +71,27 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 		settings.scrollbarWidth = getScrollbarWidth();
 
+		function getTableHeightByVisibleRows(table) {
+			var cloneContainer = $('<div id="CloneContainer" style="position: absolute; top:-1000px; left:-1000px;"></div>'),
+					visibleRows = settings.visibleRows - 1
+			$('body').append(cloneContainer);
+			table.clone().appendTo(cloneContainer);
+			$("table tbody tr:gt(" + visibleRows + ")", cloneContainer).remove();
+			var height = $("table tbody", cloneContainer).height();
+			$(cloneContainer).remove();
+
+			return height;
+		}
+
 		this.each(function()
 		{
 			var flush = settings.flush;
+			if(settings.visibleRows !== null){
+				settings.height = getTableHeightByVisibleRows($(this));
+      }
+            
+      //Store the original list of classes on the table to add to the header and footer
+      var classList = $(this).attr('class').split(/\s+/);
 			
 			var tb = $(this).addClass('tablescroll_body');
 
@@ -143,11 +161,21 @@ OTHER DEALINGS IN THE SOFTWARE.
 			if (has_thead) 
 			{
 				var tbh = $('<table class="tablescroll_head" cellspacing="0"></table>').insertBefore(wrapper).prepend($('thead',tb));
+				
+				//Add the same classes here that were in the original table
+        $.each(classList, function(index, value) {
+					tbh.addClass(value);
+        });
 			}
 
 			if (has_tfoot) 
 			{
 				var tbf = $('<table class="tablescroll_foot" cellspacing="0"></table>').insertAfter(wrapper).prepend($('tfoot',tb));
+				
+				//Add the same classes here that were in the original table
+        $.each(classList, function(index, value) {
+					tbf.addClass(value);
+        });
 			}
 
 			if (tbh != undefined)
@@ -182,7 +210,8 @@ OTHER DEALINGS IN THE SOFTWARE.
 		flush: true, // makes the last thead and tbody column flush with the scrollbar
 		width: null, // width of the table (head, body and foot), null defaults to the tables natural width
 		height: 100, // height of the scrollable area
-		containerClass: 'tablescroll' // the plugin wraps the table in a div with this css class
+		containerClass: 'tablescroll', // the plugin wraps the table in a div with this css class
+		visibleRows: null
 	};
 
 })(jQuery);
