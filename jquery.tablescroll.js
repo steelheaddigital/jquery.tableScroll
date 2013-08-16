@@ -28,190 +28,218 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 */
 
-;(function($){
+; (function ($) {
 
-	var scrollbarWidth = 0;
+    var scrollbarWidth = 0;
 
-	// http://jdsharp.us/jQuery/minute/calculate-scrollbar-width.php
-	function getScrollbarWidth() 
-	{
-		if (scrollbarWidth) return scrollbarWidth;
-		var div = $('<div style="width:50px;height:50px;overflow:hidden;position:absolute;top:-200px;left:-200px;"><div style="height:100px;"></div></div>'); 
-		$('body').append(div); 
-		var w1 = $('div', div).innerWidth(); 
-		div.css('overflow-y', 'auto'); 
-		var w2 = $('div', div).innerWidth(); 
-		$(div).remove(); 
-		scrollbarWidth = (w1 - w2);
-		return scrollbarWidth;
-	}
-	
-	$.fn.tableScroll = function(options)
-	{
-		if (options == 'undo')
-		{
-			var container = $(this).parent().parent();
-			if (container.hasClass('tablescroll_wrapper')) 
-			{
-				container.find('.tablescroll_head thead').prependTo(this);
-				container.find('.tablescroll_foot tfoot').appendTo(this);
-				container.before(this);
-				container.empty();
-			}
-			return;
-		}
+    function getScrollbarWidth() {
+        if (scrollbarWidth) return scrollbarWidth;
+        var div = $('<div style="width:50px;height:50px;overflow:hidden;position:absolute;top:-1000px;left:-1000px;"><div style="height:100px;"></div></div>');
+        $('body').append(div);
+        var w1 = $('div', div).innerWidth();
+        div.css('overflow-y', 'auto');
+        var w2 = $('div', div).innerWidth();
+        scrollbarWidth = (w1 - w2);
+        div.remove();
+        div = null;
 
-		var settings = $.extend({},$.fn.tableScroll.defaults,options);
-		
-		// Bail out if there's no vertical overflow
-		//if ($(this).height() <= settings.height)
-		//{
-		//  return this;
-		//}
+        return scrollbarWidth;
+    }
 
-		settings.scrollbarWidth = getScrollbarWidth();
+    $.fn.tableScroll = function (options) {
 
-		function getTableHeightByVisibleRows(table) {
-			var cloneContainer = $('<div id="CloneContainer" style="position: absolute; top:-1000px; left:-1000px;"></div>'),
-					visibleRows = settings.visibleRows - 1
-			$('body').append(cloneContainer);
-			table.clone().appendTo(cloneContainer);
-			$("table tbody tr:gt(" + visibleRows + ")", cloneContainer).remove();
-			var height = $("table tbody", cloneContainer).height();
-			$(cloneContainer).remove();
+        if (options == 'undo') {
+            var container = $(this).parent().parent();
+            if (container.hasClass('tablescroll_wrapper')) {
+                container.find('.tablescroll_head thead').prependTo(this);
+                container.find('.tablescroll_foot tfoot').appendTo(this);
+                container.before(this);
+                container.empty();
+            }
+            return;
+        }
 
-			return height;
-		}
+        var settings = $.extend({}, $.fn.tableScroll.defaults, options);
 
-		this.each(function()
-		{
-			var flush = settings.flush;
-			if(settings.visibleRows !== null){
-				settings.height = getTableHeightByVisibleRows($(this));
-      }
+        settings.scrollbarWidth = getScrollbarWidth();
+
+        if (settings.visibleRows !== null) {
+            settings.height = getTableHeightByVisibleRows($(this));
+        }
+
+        function getTableHeightByVisibleRows(table) {
+            var cloneContainer = $('<div id="CloneContainer" style="position: absolute; top:-1000px; left:-1000px;"></div>');
+            var visibleRows = settings.visibleRows - 1;
+            table.clone().appendTo(cloneContainer);
+            $("table tbody tr:gt(" + visibleRows + ")", cloneContainer).remove();
+
+            $('body').append(cloneContainer);
+            var height = $("table tbody", cloneContainer).height();
+            cloneContainer.remove();
+            cloneContainer = null;
+
+            return height;
+        }
+
+
+        var flush = settings.flush;
+        var table = $(this);
+
+        //Store the original list of classes on the table to add to the header and footer
+        var classList = []
+        var origClassList = table.attr('class').split(/\s+/);
+        for (var i = 0, len = origClassList.length; i < len; i++) {
+            var classValue = origClassList[i];
+            var allowedClass = classValue.indexOf("tableScroll") === -1;
+
+            //Don't include the classes added by the plugin
+            if (allowedClass === true) {
+                classList.push(classValue);
+            }
+            classValue = null;
+            allowedClass = null;
+        }
+        origClassList = null;
+
+        // find or create the wrapper div (allows tableScroll to be re-applied)
+        var wrapper;
+        if (table.parent().hasClass('tablescroll_wrapper')) {
+            wrapper = table.parent();
+        }
+        else {
+            wrapper = $('<div class="tablescroll_wrapper"></div>').insertBefore(table).append(table);
+
+        }
+
+        // check for a predefined container
+        if (!wrapper.parent('div').hasClass(settings.containerClass)) {
+            $('<div></div>').addClass(settings.containerClass).insertBefore(wrapper).append(wrapper);
+        }
+
+        var width = settings.width ? settings.width : table.outerWidth();
+
+        wrapper.css({
+            'width': width + 'px',
+            'height': settings.height + 'px',
+            'overflow': 'auto'
+        });
+
+        table.css('width', width + 'px');
+
+        // with border difference
+        var wrapper_width = wrapper.outerWidth();
+        var diff = wrapper_width - width;
+        var adjustedWrapperWidth;
+        var adjustedWrapperHeight;
+
+        var outerHeight = table.outerHeight();
+        if (outerHeight <= settings.height && outerHeight > 0) {
+            wrapper.css({ height: 'auto', width: (width - diff) + 'px' });
+            adjustedWrapperWidth = (width - diff) + 'px'
+            adjustedWrapperHeight = 'auto',
+            flush = false;
+        }
+        else {
+            adjustedWrapperWidth = ((width - diff) + settings.scrollbarWidth) + 'px',
+            adjustedWrapperHeight = settings.height + 'px'
+        }
+
+        wrapper.css({
+            'width': adjustedWrapperWidth,
+            'height': adjustedWrapperHeight,
+            'overflow': 'auto'
+        });
+
+        table.css('width', (width - diff) + 'px');
+
+        //clone the table so that some operations can be done in memory instead of manipulating the DOM, helps performance
+        var clone = table.clone(true).addClass('tablescroll_body');
+        datePickers = null;
+
+        // possible speed enhancements
+        var has_thead = $('thead', clone).length ? true : false;
+        var has_tfoot = $('tfoot', clone).length ? true : false;
+        var thead_tr_first = $('thead tr:first', clone);
+        var tbody_tr_first = $('tbody tr:first', clone);
+        var tfoot_tr_first = $('tfoot tr:first', clone);
+
+        //Get the thead from the table still in the DOM so widths are calculated correctly
+        var thead = $('thead tr:first', table);
+
+        // remember width of last cell
+        var w = 0;
+
+        var cells = $('th, td', thead)
+        for (var i = 0, len = cells.length; i < len; i++) {
+            w = $(cells[i]).width();
+            var width = w + 'px';
+
+            $('th:eq(' + i + '), td:eq(' + i + ')', thead_tr_first).css('width', width);
+            $('th:eq(' + i + '), td:eq(' + i + ')', tbody_tr_first).css('width', width);
+            if (has_tfoot) $('th:eq(' + i + '), td:eq(' + i + ')', tfoot_tr_first).css('width', width);
+        }
+        cells = null;
+
+        if (has_thead) {
+            var tbh = $('<table class="tablescroll_head" cellspacing="0"></table>').insertBefore(wrapper).prepend($('thead', clone));
+
+            //Add the same classes here that were in the original table
+            for (var i = 0, len = classList.length; i < len; i++) {
+                tbh.addClass(classList[i]);
+            }
+        }
+
+        if (has_tfoot) {
+            var tbf = $('<table class="tablescroll_foot" cellspacing="0"></table>').insertAfter(wrapper).prepend($('tfoot', clone));
+
+            //Add the same classes here that were in the original table
+            for (var i = 0, len = classList.length; i < len; i++) {
+                tbf.addClass(classList[i]);
+            }
+        }
             
-      //Store the original list of classes on the table to add to the header and footer
-      var classList = $(this).attr('class').split(/\s+/);
-			
-			var tb = $(this).addClass('tablescroll_body');
+        var wrapperWidth = wrapper.outerWidth();
+        if (tbh != undefined) {
+            tbh.css('width', width + 'px');
 
-            // find or create the wrapper div (allows tableScroll to be re-applied)
-            var wrapper;
-            if (tb.parent().hasClass('tablescroll_wrapper')) {
-                wrapper = tb.parent();
+            if (flush) {
+                $('tr:first th:last, tr:first td:last', tbh).css('width', (w + settings.scrollbarWidth) + 'px');
+                tbh.css('width', wrapperWidth + 'px');
             }
-            else {
-                wrapper = $('<div class="tablescroll_wrapper"></div>').insertBefore(tb).append(tb);
+        }
+
+        if (tbf != undefined) {
+            tbf.css('width', width + 'px');
+
+            if (flush) {
+                $('tr:first th:last, tr:first td:last', tbf).css('width', (w + settings.scrollbarWidth) + 'px');
+                tbf.css('width', wrapperWidth + 'px');
             }
+        }
 
-			// check for a predefined container
-			if (!wrapper.parent('div').hasClass(settings.containerClass))
-			{
-				$('<div></div>').addClass(settings.containerClass).insertBefore(wrapper).append(wrapper);
-			}
+        var newTable = table.replaceWith(clone);
 
-			var width = settings.width ? settings.width : tb.outerWidth();
+        clone = null;
+        container = null;
+        thead = null;
+        table = null;
+        tbh = null;
+        tbf = null;
+        thead_tr_first = null;
+        tbody_tr_first = null;
+        tfoot_tr_first = null;
 
-			wrapper.css
-			({
-				'width': width+'px',
-				'height': settings.height+'px',
-				'overflow': 'auto'
-			});
+        return this;
+    };
 
-			tb.css('width',width+'px');
-
-			// with border difference
-			var wrapper_width = wrapper.outerWidth();
-			var diff = wrapper_width-width;
-
-			// assume table will scroll
-			wrapper.css({width:((width-diff)+settings.scrollbarWidth)+'px'});
-			tb.css('width',(width-diff)+'px');
-
-			if (tb.outerHeight() <= settings.height)
-			{
-				wrapper.css({height:'auto',width:(width-diff)+'px'});
-				flush = false;
-			}
-
-			// using wrap does not put wrapper in the DOM right 
-			// away making it unavailable for use during runtime
-			// tb.wrap(wrapper);
-
-			// possible speed enhancements
-			var has_thead = $('thead',tb).length ? true : false ;
-			var has_tfoot = $('tfoot',tb).length ? true : false ;
-			var thead_tr_first = $('thead tr:first',tb);
-			var tbody_tr_first = $('tbody tr:first',tb);
-			var tfoot_tr_first = $('tfoot tr:first',tb);
-
-			// remember width of last cell
-			var w = 0;
-
-			$('th, td',thead_tr_first).each(function(i)
-			{
-				w = $(this).width();
-
-				$('th:eq('+i+'), td:eq('+i+')',thead_tr_first).css('width',w+'px');
-				$('th:eq('+i+'), td:eq('+i+')',tbody_tr_first).css('width',w+'px');
-				if (has_tfoot) $('th:eq('+i+'), td:eq('+i+')',tfoot_tr_first).css('width',w+'px');
-			});
-
-			if (has_thead) 
-			{
-				var tbh = $('<table class="tablescroll_head" cellspacing="0"></table>').insertBefore(wrapper).prepend($('thead',tb));
-				
-				//Add the same classes here that were in the original table
-        $.each(classList, function(index, value) {
-					tbh.addClass(value);
-        });
-			}
-
-			if (has_tfoot) 
-			{
-				var tbf = $('<table class="tablescroll_foot" cellspacing="0"></table>').insertAfter(wrapper).prepend($('tfoot',tb));
-				
-				//Add the same classes here that were in the original table
-        $.each(classList, function(index, value) {
-					tbf.addClass(value);
-        });
-			}
-
-			if (tbh != undefined)
-			{
-				tbh.css('width',width+'px');
-				
-				if (flush)
-				{
-					$('tr:first th:last, tr:first td:last',tbh).css('width',(w+settings.scrollbarWidth)+'px');
-					tbh.css('width',wrapper.outerWidth() + 'px');
-				}
-			}
-
-			if (tbf != undefined)
-			{
-				tbf.css('width',width+'px');
-
-				if (flush)
-				{
-					$('tr:first th:last, tr:first td:last',tbf).css('width',(w+settings.scrollbarWidth)+'px');
-					tbf.css('width',wrapper.outerWidth() + 'px');
-				}
-			}
-		});
-
-		return this;
-	};
-
-	// public
-	$.fn.tableScroll.defaults =
+    // public
+    $.fn.tableScroll.defaults =
 	{
-		flush: true, // makes the last thead and tbody column flush with the scrollbar
-		width: null, // width of the table (head, body and foot), null defaults to the tables natural width
-		height: 100, // height of the scrollable area
-		containerClass: 'tablescroll', // the plugin wraps the table in a div with this css class
-		visibleRows: null
+	    flush: true, // makes the last thead and tbody column flush with the scrollbar
+	    width: null, // width of the table (head, body and foot), null defaults to the tables natural width
+	    height: 100, // height of the scrollable area
+	    containerClass: 'tablescroll', // the plugin wraps the table in a div with this css class
+	    visibleRows: null
 	};
 
 })(jQuery);
